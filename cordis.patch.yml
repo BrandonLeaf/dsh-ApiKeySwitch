@@ -1,0 +1,7 @@
+# ApiKeySwitch bundle patch: mount the apikeyswitch plugin row.
+#
+# 通过 `dsh plugin --profile web add "github:<owner>/ApiKeySwitch#main"` 安装时，
+# 本补丁作为 bundle 层自动应用：插入 apikeyswitch 插件行，无需手动编辑组合文件。
+- insert:
+    - id: apikeyswitch
+      name: apikeyswitch

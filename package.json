@@ -1,0 +1,21 @@
+{
+  "name": "apikeyswitch",
+  "version": "1.0.0",
+  "description": "ApiKeySwitch - 按项目维护独立的 DeepSeek API Key 并手动切换（DSH 插件包）",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "license": "MIT"
+}

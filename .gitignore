@@ -1,0 +1,13 @@
+# 系统
+.DS_Store
+
+# AI 临时目录
+ai_temp/
+
+# Node
+node_modules/
+
+# 本地密钥与凭据（禁止提交真实密钥）
+*.credentials.yaml
+.env
+.env.*

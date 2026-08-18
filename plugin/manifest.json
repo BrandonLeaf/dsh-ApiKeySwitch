@@ -1,0 +1,27 @@
+{
+  "name": "ApiKeySwitch",
+  "idPrefix": "apik",
+  "version": "1.0.0",
+  "purpose": "按项目维护独立的 DeepSeek API Key：模型工具 + 作曲栏切换下拉框 + Run 卡片面板 + 设置页管理，切换时同步模型供应商与默认模型。",
+  "platforms": ["host", "client"],
+  "activeSlotRef": "DEEPSEEK_API_KEY",
+  "backupRef": "DSH_APIK_BACKUP",
+  "metaRef": "DSH_APIK_META",
+  "defaultProvider": "deepseek-official",
+  "defaultModel": "deepseek-v4-flash",
+  "builtinProfiles": [
+    { "id": "personal", "label": "default", "remark": "默认", "ref": "DEEPSEEK_API_KEY", "protected": true },
+    { "id": "demo1", "label": "demo1", "remark": "示例项目 1", "ref": "DSH_DEMO1_API_KEY" },
+    { "id": "demo2", "label": "demo2", "remark": "示例项目 2", "ref": "DSH_DEMO2_API_KEY" },
+    { "id": "demo3", "label": "demo3", "remark": "示例项目 3", "ref": "DSH_DEMO3_API_KEY" },
+    { "id": "demo4", "label": "demo4", "remark": "示例项目 4", "ref": "DSH_DEMO4_API_KEY" },
+    { "id": "demo5", "label": "demo5", "remark": "示例项目 5", "ref": "DSH_DEMO5_API_KEY" }
+  ],
+  "slots": {
+    "settings": { "id": "apik-switch", "label": "API Key 管理", "order": 12 },
+    "composer": { "id": "apik-composer-switch", "order": 100 },
+    "runCard": "tool.view.cordis"
+  },
+  "tools": ["api_key_status", "api_key_switch", "api_key_set"],
+  "rpcMethods": ["status", "list", "models", "switch", "set", "save", "add", "remove"]
+}
