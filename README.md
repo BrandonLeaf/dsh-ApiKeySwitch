@@ -131,3 +131,10 @@ dsh plugin --profile web add "https://github.com/BrandonLeaf/dsh-ApiKeySwitch#ma
 - 当前部署仅挂载 `deepseek-official` 供应商；`dsh-llm-example`（示例供应商）已安装但未挂载，配置其他供应商需先修改宿主组合（`~/.dsh/profiles/web/cordis.patch.yml`）并重启 Web 服务
 - 文档与示例中不得出现真实 API Key，一律使用占位符（如 `sk-REPLACE_ME`）
 - 本仓库为示例形态：内置项目均为示例名称（demo1 至 demo5），真实项目名称、备注与凭据引用不得写入仓库
+
+
+## 效果图
+![alt text](README.link/image-2.png)
+![alt text](README.link/image-1.png)
+
+
