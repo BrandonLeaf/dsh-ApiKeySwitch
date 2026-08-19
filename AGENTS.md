@@ -65,6 +65,7 @@ domains: [documentation, security, code-style, build-test]
 - 切换项目：备份当前生效 Key（如处于 default）→ 写入目标项目 Key → 通过 agentDefaultModel.saveSelection 同步默认路由（供应商 + 模型）
 - 生效判定：扫描非 default 项目的引用值是否与生效槽相等，未匹配则为 default
 - 旧版迁移：首次运行时删除 DSH_PERSONAL_API_KEY，其值转入备份槽
+- 会话记忆：每个会话在 localStorage（键 apikeyswitch.conv.<sessionId>）记录自己最后选择的项目；会话激活（作曲栏下拉框挂载）时若记忆项目与当前生效项目不同则静默切回，保证切换会话后 Key 跟随该会话
 
 # Knowledge: 配置
 
@@ -103,4 +104,5 @@ api_key_status / api_key_switch / api_key_set；RPC：status / list / models / s
 - 路由同步写入默认模型选择，对当前会话运行中的模型由作曲栏「模型切换框」主导
 - 当前部署仅挂载 deepseek-official 供应商；dsh-llm-example（示例供应商）已安装但未挂载，其他供应商需先修改宿主组合
 - 凭据文件 ~/.dsh/.credentials.yaml 权限必须保持 600
+- 会话记忆基于全局生效槽实现：激活会话自动恢复会改写全局生效 Key，其他会话中运行中的后台任务会随会话切换换 Key（运行时无每会话独立槽位）
 - 本仓库为示例形态：内置项目均为示例名称（demo1 至 demo5），MUST NOT 将真实项目名称、备注或凭据引用写入仓库

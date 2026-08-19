@@ -246,9 +246,32 @@ return {
     const dimBtnStyle = { opacity: 0.55 }
     const smallBtnStyle = { padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(127,127,127,.5)', background: 'transparent', color: 'inherit', cursor: 'pointer', fontSize: 12 }
 
+    // ── 每会话记忆：切换会话时自动恢复该会话上次选择的项目 ──
+    // sessionId 来自会话级插槽标准 props；记忆存 localStorage（按会话隔离）。
+    // 会话激活（作曲栏下拉框挂载）时，若记忆项目与当前全局生效项目不同则静默切回。
+    const convMemoryPrefix = 'apikeyswitch.conv.'
+    const convMemoryKey = (sessionId) => convMemoryPrefix + sessionId
+    const rememberConv = (sessionId, profileId) => {
+      try {
+        if (sessionId && profileId) localStorage.setItem(convMemoryKey(sessionId), profileId)
+      } catch (e) { /* 忽略存储异常 */ }
+    }
+    const rememberedConv = (sessionId) => {
+      try {
+        if (!sessionId) return null
+        return localStorage.getItem(convMemoryKey(sessionId))
+      } catch (e) { return null }
+    }
+    const forgetConv = (sessionId) => {
+      try {
+        if (sessionId) localStorage.removeItem(convMemoryKey(sessionId))
+      } catch (e) { /* 忽略存储异常 */ }
+    }
+
     slots.inject('tool.view.cordis', () => slots.register(
       { name: 'tool.view.cordis', key: 'self' },
-      () => {
+      (props) => {
+        const sessionId = props && props.sessionId
         const [status, setStatus] = React.useState(null)
         const [busy, setBusy] = React.useState('')
         const [error, setError] = React.useState('')
@@ -272,7 +295,11 @@ return {
           setBusy(id)
           setError('')
           host.call('switch', { profile: id })
-            .then(applyResult)
+            .then((v) => {
+              const value = v || {}
+              if (value.ok !== false) rememberConv(sessionId, id)
+              applyResult(v)
+            })
             .catch((err) => setError(String(err && err.message ? err.message : err)))
             .then(() => setBusy(''))
         }
@@ -338,7 +365,8 @@ return {
 
     slots.inject('conversation.input.right', () => slots.register(
       { name: 'conversation.input.right', id: 'apik-composer-switch', order: 100 },
-      () => {
+      (props) => {
+        const sessionId = props && props.sessionId
         const [status, setStatus] = React.useState(null)
         const [busy, setBusy] = React.useState(false)
         const [open, setOpen] = React.useState(false)
@@ -355,14 +383,35 @@ return {
           host.call('status').then(applyResult).catch((err) => setError(String(err && err.message ? err.message : err)))
         }
 
-        React.useEffect(() => { refresh() }, [])
+        const restoreConv = () => {
+          const mem = rememberedConv(sessionId)
+          if (!mem) return
+          host.call('status').then((v) => {
+            const value = v || {}
+            if (value.ok === false || !Array.isArray(value.profiles)) return
+            if (value.activeProfile === mem) return
+            const target = value.profiles.find((p) => p.id === mem)
+            if (!target || !target.configured) { forgetConv(sessionId); return }
+            host.call('switch', { profile: mem }).then((r) => {
+              const res = r || {}
+              if (res.ok === false) forgetConv(sessionId)
+              else applyResult(r)
+            }).catch(() => { /* 静默：恢复失败不打扰用户 */ })
+          }).catch(() => { /* 静默 */ })
+        }
+
+        React.useEffect(() => { refresh(); restoreConv() }, [])
 
         const doSwitch = (id) => {
           if (busy || !id) return
           setBusy(true)
           setError('')
           host.call('switch', { profile: id })
-            .then(applyResult)
+            .then((v) => {
+              const value = v || {}
+              if (value.ok === false) setError(String(value.error || '切换失败'))
+              else { rememberConv(sessionId, id); applyResult(v) }
+            })
             .catch((err) => setError(String(err && err.message ? err.message : err)))
             .then(() => setBusy(false))
         }
