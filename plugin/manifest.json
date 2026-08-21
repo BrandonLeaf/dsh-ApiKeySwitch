@@ -1,7 +1,7 @@
 {
   "name": "ApiKeySwitch",
   "idPrefix": "apik",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "purpose": "按项目维护独立的 DeepSeek API Key：模型工具 + 作曲栏切换下拉框 + Run 卡片面板 + 设置页管理，切换时同步模型供应商与默认模型。",
   "platforms": ["host", "client"],
   "activeSlotRef": "DEEPSEEK_API_KEY",

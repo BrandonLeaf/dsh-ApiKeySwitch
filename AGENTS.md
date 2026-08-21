@@ -39,7 +39,7 @@ domains: [documentation, security, code-style, build-test]
 
 项目名称：ApiKeySwitch
 项目定位：DeepSeek Harness（DSH）Cordis 插件源码项目，为 DSH 提供按项目维护多把 DeepSeek API Key 并手动切换的能力。
-运行环境：DSH 0.1.0-rc.7（@deepseek-ai/dsh）。
+运行环境：DSH 0.1.0-rc.8（@deepseek-ai/dsh）。
 代码形态：仓库根目录即正式部署插件包（lib/ + package.json + cordis.patch.yml，支持 dsh plugin add 官方安装）；plugin/ 为动态插件形态（cordis_define 的 code.host / code.client 原文）。
 
 # Knowledge: 架构

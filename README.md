@@ -20,7 +20,7 @@ DSH 默认只为整个进程配置一把 API Key。本插件通过 DSH 的凭据
 
 | 项 | 说明 |
 | --- | --- |
-| 宿主环境 | DSH 0.1.0-rc.7（@deepseek-ai/dsh） |
+| 宿主环境 | DSH 0.1.0-rc.8（@deepseek-ai/dsh） |
 | 插件形态 | 动态 Cordis 插件（Host + Client 双半区，Plain JavaScript） |
 | Host 接口 | `credentials` 服务、`agentDefaultModel` 服务、`harness`（defineTool / registerTool / handle） |
 | Client 接口 | `slots`（settings.section / conversation.input.right / tool.view.cordis）、`host.call`、`styles`、React（createElement） |
@@ -78,7 +78,7 @@ dsh plugin --profile web add "https://github.com/BrandonLeaf/dsh-ApiKeySwitch#ma
 
 流程：pnpm 安装仓库根目录为依赖 → `dsh plugin` 自动把声明了 `dsh.bundle` 的新依赖加入 `dsh.profile.bundles` → 启动时 bundle 补丁（`cordis.patch.yml`）自动插入插件行 → 插件挂载。无需手动编辑组合文件。安装后重启 `dsh web` 并刷新页面即可。
 
-要求：机器装有 pnpm 且可访问 git 托管地址；`github:` 为 pnpm spec，GitLab/内网仓库可改用 `git+https://...` 或 `git+ssh://...`；建议用标签固定版本（如 `#v1.0.0`）。
+要求：机器装有 pnpm 且可访问 git 托管地址；`github:` 为 pnpm spec，GitLab/内网仓库可改用 `git+https://...` 或 `git+ssh://...`；建议用标签固定版本（如 `#v0.1.0-rc.8-p-0.1.0`）。
 
 **方式 B：手动复制（本地单机）**
 
