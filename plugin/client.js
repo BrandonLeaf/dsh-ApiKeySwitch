@@ -54,9 +54,69 @@ return {
       '.apik-set-err{color:var(--dsw-alias-state-error-primary);margin:0;font-size:12px;line-height:18px}'
     ))
 
+    // ── 切换成功 Toast 样式：帧级浮层底部居中，容器可点击穿透 ──
+    ctx.effect(() => styles.insert(
+      '.apik-toastLayer{pointer-events:none;position:fixed;left:0;right:0;bottom:92px;z-index:60;display:flex;justify-content:center}' +
+      '.apik-toast{pointer-events:auto;background:var(--dsw-specific-menu);color:var(--dsw-alias-label-primary);border:1px solid var(--dsw-alias-border-inverted);box-shadow:var(--dsw-shadow-lv3);align-items:center;gap:8px;border-radius:999px;padding:8px 16px;font-size:13px;line-height:20px;display:flex;animation:apik-toast-in .18s ease-out}' +
+      '.apik-toastOk{color:var(--dsw-alias-state-success-primary);flex:none;display:flex}' +
+      '@keyframes apik-toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}'
+    ))
+
     const LABELS = {
       personal: 'default',
     }
+
+    // ── 切换成功提示：帧级悬浮 Toast ──
+    // 宿主提供 shell.overlay 帧级浮层插槽（列表型、可叠加、可点击穿透），
+    // 本插件在此注册 Toast 容器；作曲栏下拉框、Run 卡片面板手动切换成功后
+    // 调用 notifySwitch 弹出「API Key 切换成功」提示。
+    // 会话激活时的静默恢复（restoreConv）属于自动行为，不弹提示。
+    let toastListeners = []
+    let toastSeq = 0
+    let toastTimer = null
+
+    const publishToast = (text) => {
+      const listeners = toastListeners.slice()
+      for (const fn of listeners) {
+        try { fn(text) } catch (e) { /* 单个订阅者异常不影响其他订阅者 */ }
+      }
+    }
+    const notifySwitch = (id, value) => {
+      let name = LABELS[id] || id
+      const list = (value && value.profiles) || []
+      for (const p of list) {
+        if (p.id !== id) continue
+        if (p.remark && p.remark !== name) name += '（' + p.remark + '）'
+        break
+      }
+      publishToast('API Key 切换成功：已切换至「' + name + '」')
+    }
+
+    slots.inject('shell.overlay', () => slots.register(
+      { name: 'shell.overlay', id: 'apik-toast', order: 100 },
+      () => {
+        const [toast, setToast] = React.useState(null)
+        React.useEffect(() => {
+          const sub = (text) => { toastSeq += 1; setToast({ text: text, seq: toastSeq }) }
+          toastListeners.push(sub)
+          return () => { toastListeners = toastListeners.filter((s) => s !== sub) }
+        }, [])
+        React.useEffect(() => {
+          if (!toast) return
+          if (toastTimer) clearTimeout(toastTimer)
+          toastTimer = setTimeout(() => setToast(null), 2600)
+          return () => { if (toastTimer) clearTimeout(toastTimer) }
+        }, [toast])
+        const icon = React.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          React.createElement('polyline', { points: '20 6 9 17 4 12' }))
+        return React.createElement('div', { className: 'apik-toastLayer' },
+          toast ? React.createElement('div', { className: 'apik-toast', key: toast.seq, role: 'status' },
+            React.createElement('span', { className: 'apik-toastOk' }, icon),
+            React.createElement('span', null, toast.text),
+          ) : null,
+        )
+      },
+    ))
 
     slots.inject('settings.section', () => slots.register(
       { name: 'settings.section', id: 'apik-switch', order: 12, label: 'API Key 管理' },
@@ -182,7 +242,7 @@ return {
               ),
               field('名称 name', React.createElement('input', { className: 'apik-set-input', value: d.editId, disabled: !r.user, placeholder: '小写字母与数字（1-20 位）', onChange: (e) => patchDraft(r.id, { editId: e.target.value }) })),
               field(r.configured ? 'API Key（已配置，留空不修改）' : 'API Key（未配置）', React.createElement('input', { className: 'apik-set-input', type: 'password', value: d.key, placeholder: 'sk- 开头', onChange: (e) => patchDraft(r.id, { key: e.target.value }) })),
-              field('备注 remark', React.createElement('input', { className: 'apik-set-input', value: d.remark, placeholder: '如：示例项目', onChange: (e) => patchDraft(r.id, { remark: e.target.value }) })),
+              field('备注 remark', React.createElement('input', { className: 'apik-set-input', value: d.remark, placeholder: '如：内部系统', onChange: (e) => patchDraft(r.id, { remark: e.target.value }) })),
               field('模型供应商 provider', React.createElement('input', { className: 'apik-set-input', list: 'apik-provider-list', value: d.provider, placeholder: '如 deepseek-official', onChange: (e) => patchDraft(r.id, { provider: e.target.value }) })),
               field('默认模型 model', React.createElement('input', { className: 'apik-set-input', list: 'apik-model-list', value: d.model, placeholder: '如 deepseek-v4-flash', onChange: (e) => patchDraft(r.id, { model: e.target.value }) })),
               React.createElement('div', { className: 'apik-set-editorActions' },
@@ -201,7 +261,7 @@ return {
           ),
           field('名称 name', React.createElement('input', { className: 'apik-set-input', value: addDraft.editId, placeholder: '小写字母与数字（1-20 位）', onChange: (e) => patchAdd({ editId: e.target.value }) })),
           field('API Key', React.createElement('input', { className: 'apik-set-input', type: 'password', value: addDraft.key, placeholder: 'sk- 开头', onChange: (e) => patchAdd({ key: e.target.value }) })),
-          field('备注 remark', React.createElement('input', { className: 'apik-set-input', value: addDraft.remark, placeholder: '如：示例项目', onChange: (e) => patchAdd({ remark: e.target.value }) })),
+          field('备注 remark', React.createElement('input', { className: 'apik-set-input', value: addDraft.remark, placeholder: '如：内部系统', onChange: (e) => patchAdd({ remark: e.target.value }) })),
           field('模型供应商 provider', React.createElement('input', { className: 'apik-set-input', list: 'apik-provider-list', value: addDraft.provider, placeholder: '如 deepseek-official', onChange: (e) => patchAdd({ provider: e.target.value }) })),
           field('默认模型 model', React.createElement('input', { className: 'apik-set-input', list: 'apik-model-list', value: addDraft.model, placeholder: '如 deepseek-v4-flash', onChange: (e) => patchAdd({ model: e.target.value }) })),
           React.createElement('div', { className: 'apik-set-editorActions' },
@@ -297,7 +357,7 @@ return {
           host.call('switch', { profile: id })
             .then((v) => {
               const value = v || {}
-              if (value.ok !== false) rememberConv(sessionId, id)
+              if (value.ok !== false) { rememberConv(sessionId, id); notifySwitch(id, value) }
               applyResult(v)
             })
             .catch((err) => setError(String(err && err.message ? err.message : err)))
@@ -410,7 +470,7 @@ return {
             .then((v) => {
               const value = v || {}
               if (value.ok === false) setError(String(value.error || '切换失败'))
-              else { rememberConv(sessionId, id); applyResult(v) }
+              else { rememberConv(sessionId, id); notifySwitch(id, value); applyResult(v) }
             })
             .catch((err) => setError(String(err && err.message ? err.message : err)))
             .then(() => setBusy(false))
@@ -420,6 +480,26 @@ return {
         const activeId = (status && status.activeProfile) || ''
         const activeLabel = LABELS_KS[activeId] || activeId || '…'
 
+        // 点击外部自动收起：菜单打开期间监听 document 的 pointerdown / Escape，
+        // 点击目标不在下拉框容器内（或按下 Escape）即收起。
+        // 不使用捕获阶段则可能被宿主组件的 stopPropagation 拦截导致无法收起。
+        const rootRef = React.useRef(null)
+        React.useEffect(() => {
+          if (!open) return
+          const onDocDown = (e) => {
+            if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false)
+          }
+          const onDocKey = (e) => {
+            if (e.key === 'Escape') setOpen(false)
+          }
+          document.addEventListener('pointerdown', onDocDown, true)
+          document.addEventListener('keydown', onDocKey, true)
+          return () => {
+            document.removeEventListener('pointerdown', onDocDown, true)
+            document.removeEventListener('keydown', onDocKey, true)
+          }
+        }, [open])
+
         const onBlur = (e) => {
           const next = e.relatedTarget
           if (!next || !e.currentTarget.contains(next)) setOpen(false)
@@ -428,7 +508,7 @@ return {
           if (e.key === 'Escape') setOpen(false)
         }
 
-        return React.createElement('div', { className: 'apik-ks-root', onBlur: onBlur, onKeyDown: onKeyDown },
+        return React.createElement('div', { className: 'apik-ks-root', ref: rootRef, onBlur: onBlur, onKeyDown: onKeyDown },
           React.createElement('button', {
             type: 'button',
             className: 'apik-ks-trigger',

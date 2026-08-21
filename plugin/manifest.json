@@ -10,17 +10,13 @@
   "defaultProvider": "deepseek-official",
   "defaultModel": "deepseek-v4-flash",
   "builtinProfiles": [
-    { "id": "personal", "label": "default", "remark": "默认", "ref": "DEEPSEEK_API_KEY", "protected": true },
-    { "id": "demo1", "label": "demo1", "remark": "示例项目 1", "ref": "DSH_DEMO1_API_KEY" },
-    { "id": "demo2", "label": "demo2", "remark": "示例项目 2", "ref": "DSH_DEMO2_API_KEY" },
-    { "id": "demo3", "label": "demo3", "remark": "示例项目 3", "ref": "DSH_DEMO3_API_KEY" },
-    { "id": "demo4", "label": "demo4", "remark": "示例项目 4", "ref": "DSH_DEMO4_API_KEY" },
-    { "id": "demo5", "label": "demo5", "remark": "示例项目 5", "ref": "DSH_DEMO5_API_KEY" }
+    { "id": "personal", "label": "default", "remark": "默认", "ref": "DEEPSEEK_API_KEY", "protected": true }
   ],
   "slots": {
     "settings": { "id": "apik-switch", "label": "API Key 管理", "order": 12 },
     "composer": { "id": "apik-composer-switch", "order": 100 },
-    "runCard": "tool.view.cordis"
+    "runCard": "tool.view.cordis",
+    "toast": { "slot": "shell.overlay", "id": "apik-toast", "order": 100 }
   },
   "tools": ["api_key_status", "api_key_switch", "api_key_set"],
   "rpcMethods": ["status", "list", "models", "switch", "set", "save", "add", "remove"]

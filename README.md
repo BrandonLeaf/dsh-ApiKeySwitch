@@ -10,11 +10,11 @@ DSH 默认只为整个进程配置一把 API Key。本插件通过 DSH 的凭据
 - Run 卡片内切换面板
 - 模型工具：`api_key_status` / `api_key_switch` / `api_key_set`
 
-切换写入 `DEEPSEEK_API_KEY`（生效槽），模型提供商每次请求重新解析，立即生效、无需重启。切换时通过 `agentDefaultModel.saveSelection` 同步默认路由（供应商 + 模型）。
+切换写入 `DEEPSEEK_API_KEY`（生效槽），模型提供商每次请求重新解析，立即生效、无需重启。切换时通过 `agentDefaultModel.saveSelection` 同步默认路由（供应商 + 模型）。手动切换成功后页面底部弹出「API Key 切换成功」Toast 提示（会话激活时的静默恢复不提示）。
 
 每个会话会记住自己最后选择的项目（localStorage，按会话隔离）：切换到其他会话时自动恢复该会话的项目与 Key，不再串用上一个会话的 Key。
 
-内置 6 个项目：default（默认）、demo1（示例项目 1）、demo2（示例项目 2）、demo3（示例项目 3）、demo4（示例项目 4）、demo5（示例项目 5）；另支持在设置页新增/删除自定义项目（default 受保护不可删除）。内置项目均为示例占位，真实项目名称与凭据引用不入库。
+内置项目仅 default（默认，受保护不可删除）；其他项目均在设置页「API Key 管理」中新增，每个项目独立维护 Key、备注、模型供应商与默认模型。真实项目名称与凭据引用不入库。
 
 ## 技术栈
 
@@ -130,7 +130,7 @@ dsh plugin --profile web add "https://github.com/BrandonLeaf/dsh-ApiKeySwitch#ma
 - 路由同步写入默认模型选择；当前会话运行中的模型由作曲栏「模型切换框」主导
 - 当前部署仅挂载 `deepseek-official` 供应商；`dsh-llm-example`（示例供应商）已安装但未挂载，配置其他供应商需先修改宿主组合（`~/.dsh/profiles/web/cordis.patch.yml`）并重启 Web 服务
 - 文档与示例中不得出现真实 API Key，一律使用占位符（如 `sk-REPLACE_ME`）
-- 本仓库为示例形态：内置项目均为示例名称（demo1 至 demo5），真实项目名称、备注与凭据引用不得写入仓库
+- 本仓库为示例形态，真实项目名称、备注与凭据引用不得写入仓库
 
 
 ## 效果图

@@ -71,16 +71,11 @@ domains: [documentation, security, code-style, build-test]
 
 ## 凭据引用清单
 
-> 示例说明：本清单为示例内容（demo1 至 demo5），真实项目名称与引用不入库。
+> 示例说明：内置项目仅 default（直接使用生效槽）；其他项目为设置页新增的自定义项目，引用形如 `DSH_<NAME>_API_KEY`。真实项目名称与引用不入库。
 
 | 引用 | 用途 |
 | --- | --- |
 | DEEPSEEK_API_KEY | 生效槽，也是 default 项目的引用 |
-| DSH_DEMO1_API_KEY | 示例项目 1 |
-| DSH_DEMO2_API_KEY | 示例项目 2 |
-| DSH_DEMO3_API_KEY | 示例项目 3 |
-| DSH_DEMO4_API_KEY | 示例项目 4 |
-| DSH_DEMO5_API_KEY | 示例项目 5 |
 | DSH_APIK_BACKUP | 隐藏备份槽 |
 | DSH_APIK_META | 项目元数据 JSON |
 
@@ -91,6 +86,7 @@ domains: [documentation, security, code-style, build-test]
 | settings.section | apik-switch | 设置页「API Key 管理」（order 12） |
 | conversation.input.right | apik-composer-switch | 作曲栏切换下拉框（order 100） |
 | tool.view.cordis | self | Run 卡片切换面板 |
+| shell.overlay | apik-toast | 切换成功 Toast 容器（order 100） |
 
 ## 模型工具
 
@@ -105,4 +101,4 @@ api_key_status / api_key_switch / api_key_set；RPC：status / list / models / s
 - 当前部署仅挂载 deepseek-official 供应商；dsh-llm-example（示例供应商）已安装但未挂载，其他供应商需先修改宿主组合
 - 凭据文件 ~/.dsh/.credentials.yaml 权限必须保持 600
 - 会话记忆基于全局生效槽实现：激活会话自动恢复会改写全局生效 Key，其他会话中运行中的后台任务会随会话切换换 Key（运行时无每会话独立槽位）
-- 本仓库为示例形态：内置项目均为示例名称（demo1 至 demo5），MUST NOT 将真实项目名称、备注或凭据引用写入仓库
+- 本仓库为示例形态，MUST NOT 将真实项目名称、备注或凭据引用写入仓库
