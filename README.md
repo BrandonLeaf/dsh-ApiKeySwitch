@@ -14,6 +14,8 @@ DSH 默认只为整个进程配置一把 API Key。本插件通过 DSH 的凭据
 
 每个会话会记住自己最后选择的项目（localStorage，按会话隔离）：切换到其他会话时自动恢复该会话的项目与 Key，不再串用上一个会话的 Key。
 
+**切换守卫（防并发交叉污染）**：切换前宿主探测「是否有**其他**会话正在执行任务」（`agents` 服务中任意 agent 的 `status` 为 `running`，含子代理；调用者自身会话放行）。检测到其他会话运行中时，手动切换（作曲栏下拉框 / Run 卡片面板）、会话激活自动恢复、模型工具 `api_key_switch` 一律拒绝并提示「请先停止运行中的会话后再切换」；守卫触发时 Toast 提示，会话记忆保留（下次激活且空闲时再恢复）。原因：生效槽是进程级全局单槽，其他会话运行中的下一轮模型请求会立即使用新 Key 造成跨会话使用量交叉污染；守卫把"并发切换"的风险语义改为"先停止、再切换"。
+
 内置项目仅 default（默认，受保护不可删除）；其他项目均在设置页「API Key 管理」中新增，每个项目独立维护 Key、备注、模型供应商与默认模型。真实项目名称与凭据引用不入库。
 
 ## 技术栈
@@ -57,7 +59,8 @@ Host 内部函数一览：
 | --- | --- |
 | `catalog()` | 完整项目目录 = 内置项目（含元数据覆盖）+ 用户自定义项目 |
 | `collectStatus()` | 当前生效判定（引用值匹配，未匹配则为 default）+ 各项目配置状态 |
-| `switchProfile(id)` | 切换 Key（备份/恢复 default）+ 同步默认路由 |
+| `switchProfile(id, opts)` | 切换 Key（备份/恢复 default）+ 同步默认路由；`opts.guard === false` 可显式关闭运行会话守卫（运维强制切换） |
+| `guardRunning(opts)` / `collectRunningSessions()` | 运行会话守卫：探测 agents 服务中 status 为 running 的会话（排除调用者自身会话），命中则返回阻止结果（`ok:false` + `guard:true` + `running` 列表） |
 | `syncRoute(profile)` | 通过 `agentDefaultModel.saveSelection` 写入供应商 + 模型 |
 | `saveProfile / addProfile / removeProfile` | 设置页增删改（删除仅限非 default） |
 | `migrateLegacy()` | 旧版迁移：删除 DSH_PERSONAL_API_KEY，值转入备份槽 |
@@ -82,7 +85,7 @@ dsh plugin --profile web add "https://github.com/BrandonLeaf/dsh-ApiKeySwitch#ma
 
 **方式 B：手动复制（本地单机）**
 
-1. 将 `lib/`、`package.json`、`cordis.patch.yml` 放入 `~/.dsh/profiles/web/node_modules/apikswitch/`；
+1. 将 `lib/`、`package.json`、`cordis.patch.yml` 放入 `~/.dsh/profiles/web/node_modules/apikeyswitch/`；
 2. 在 `~/.dsh/profiles/web/cordis.patch.yml` 追加挂载行：
 
 ```yaml
@@ -126,7 +129,9 @@ dsh plugin --profile web add "https://github.com/BrandonLeaf/dsh-ApiKeySwitch#ma
 
 - 动态插件是进程内临时实体：进程重启后需重新加载，历史版本 Package 不可单独删除
 - 切换对全局生效：所有会话共用一条模型路由
-- 会话记忆基于全局生效槽：切换会话时自动恢复会改写全局生效 Key，其他会话运行中的后台任务会随会话切换换 Key
+- 切换守卫基于 `agents` 服务运行状态：守卫检查与写入生效槽之间存在极小的竞态窗口（检查后、写入前会话可能起步），需要严格隔离时应为每个项目使用独立 DSH profile 或独立进程
+- 会话记忆基于全局生效槽：切换会话时自动恢复会改写全局生效 Key；有会话正在执行任务时恢复被守卫阻止，需先停止运行中的任务
+- 运行时无每会话独立槽位：同一实例内两个会话并发执行时，Key 归属由请求发起瞬间的全局生效槽决定，守卫只能阻止"切换动作"，不能阻止"切完后新起步的请求"使用当前全局 Key
 - 路由同步写入默认模型选择；当前会话运行中的模型由作曲栏「模型切换框」主导
 - 当前部署仅挂载 `deepseek-official` 供应商；`dsh-llm-example`（示例供应商）已安装但未挂载，配置其他供应商需先修改宿主组合（`~/.dsh/profiles/web/cordis.patch.yml`）并重启 Web 服务
 - 文档与示例中不得出现真实 API Key，一律使用占位符（如 `sk-REPLACE_ME`）

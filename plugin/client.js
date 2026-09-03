@@ -354,10 +354,11 @@ return {
           if (busy) return
           setBusy(id)
           setError('')
-          host.call('switch', { profile: id })
+          host.call('switch', { profile: id, sessionId: sessionId })
             .then((v) => {
               const value = v || {}
               if (value.ok !== false) { rememberConv(sessionId, id); notifySwitch(id, value) }
+              else if (value.guard === true) publishToast('已阻止切换：' + (value.error || '有会话正在执行任务'))
               applyResult(v)
             })
             .catch((err) => setError(String(err && err.message ? err.message : err)))
@@ -366,6 +367,10 @@ return {
 
         const profiles = (status && status.profiles) || []
         const activeId = (status && status.activeProfile) || ''
+        // 运行中的"其他会话"数（自身会话不算，自有切换不受守卫阻止）
+        const othersRunning = (status && Array.isArray(status.running))
+          ? status.running.filter((r) => (r.sessionId || '') !== (sessionId || '')).length
+          : 0
 
         return React.createElement('div', { style: panelStyle },
           React.createElement('div', { style: headerStyle }, 'API Key 切换面板'),
@@ -376,6 +381,10 @@ return {
             React.createElement('span', { style: { marginLeft: 8, fontSize: 12, opacity: 0.7 } }, '设置页面可管理项目与 Key'),
           ),
           error ? React.createElement('div', { style: errorStyle }, error) : null,
+          othersRunning > 0
+            ? React.createElement('div', { style: { color: '#b8860b', margin: '4px 0' } },
+              othersRunning + ' 个其他会话正在执行任务，切换将被阻止（防止 API Key 串用）')
+            : null,
           React.createElement('div', { style: wrapStyle },
             profiles.map((p) => React.createElement('button', {
               key: p.id,
@@ -406,6 +415,7 @@ return {
       '.apik-ks-chevronOpen{transform:rotate(180deg)}' +
       '.apik-ks-menu{z-index:20;border:1px solid var(--dsw-alias-border-inverted);background:var(--dsw-specific-menu);width:min(220px,100vw - 32px);max-height:min(320px,100vh - 96px);box-shadow:var(--dsw-shadow-lv3);color:var(--dsw-alias-label-primary);border-radius:12px;flex-direction:column;padding:4px;display:flex;position:absolute;bottom:calc(100% + 8px);right:0;overflow-y:auto}' +
       '.apik-ks-error{background:var(--dsw-alias-interactive-bg-hover-danger);color:var(--dsw-alias-state-error-primary);border-radius:8px;gap:8px;margin-bottom:4px;padding:7px 8px;font-size:12px;line-height:18px;display:flex}' +
+      '.apik-ks-warn{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);border-radius:8px;gap:8px;margin-bottom:4px;padding:7px 8px;font-size:12px;line-height:18px;display:flex}' +
       '.apik-ks-option{width:100%;min-height:38px;color:inherit;text-align:left;cursor:pointer;background:transparent;border:none;border-radius:10px;outline:none;align-items:center;gap:8px;padding:6px 8px;display:flex}' +
       '.apik-ks-option:hover:not(:disabled),.apik-ks-option:focus-visible{background:var(--dsw-alias-interactive-bg-hover)}' +
       '.apik-ks-option:disabled{color:var(--dsw-alias-label-dimmed);cursor:default}' +
@@ -452,10 +462,18 @@ return {
             if (value.activeProfile === mem) return
             const target = value.profiles.find((p) => p.id === mem)
             if (!target || !target.configured) { forgetConv(sessionId); return }
-            host.call('switch', { profile: mem }).then((r) => {
+            host.call('switch', { profile: mem, sessionId: sessionId }).then((r) => {
               const res = r || {}
-              if (res.ok === false) forgetConv(sessionId)
-              else applyResult(r)
+              if (res.ok === false) {
+                if (res.guard === true) {
+                  // 有会话正在执行任务：保留记忆（下次会话激活且空闲时再恢复），并明确提示
+                  publishToast('已阻止自动恢复：' + (res.error || '有会话正在执行任务'))
+                } else {
+                  forgetConv(sessionId)
+                }
+              } else {
+                applyResult(r)
+              }
             }).catch(() => { /* 静默：恢复失败不打扰用户 */ })
           }).catch(() => { /* 静默 */ })
         }
@@ -466,11 +484,13 @@ return {
           if (busy || !id) return
           setBusy(true)
           setError('')
-          host.call('switch', { profile: id })
+          host.call('switch', { profile: id, sessionId: sessionId })
             .then((v) => {
               const value = v || {}
-              if (value.ok === false) setError(String(value.error || '切换失败'))
-              else { rememberConv(sessionId, id); notifySwitch(id, value); applyResult(v) }
+              if (value.ok === false) {
+                if (value.guard === true) publishToast('已阻止切换：' + (value.error || '有会话正在执行任务'))
+                setError(String(value.error || '切换失败'))
+              } else { rememberConv(sessionId, id); notifySwitch(id, value); applyResult(v) }
             })
             .catch((err) => setError(String(err && err.message ? err.message : err)))
             .then(() => setBusy(false))
@@ -479,6 +499,10 @@ return {
         const profiles = (status && status.profiles) || []
         const activeId = (status && status.activeProfile) || ''
         const activeLabel = LABELS_KS[activeId] || activeId || '…'
+        // 运行中的"其他会话"数（自身会话不算，自有切换不受守卫阻止）
+        const othersRunning = (status && Array.isArray(status.running))
+          ? status.running.filter((r) => (r.sessionId || '') !== (sessionId || '')).length
+          : 0
 
         // 点击外部自动收起：菜单打开期间监听 document 的 pointerdown / Escape，
         // 点击目标不在下拉框容器内（或按下 Escape）即收起。
@@ -522,6 +546,9 @@ return {
           ),
           open ? React.createElement('div', { className: 'apik-ks-menu', role: 'menu' },
             error ? React.createElement('div', { className: 'apik-ks-error' }, error) : null,
+            othersRunning > 0 ? React.createElement('div', { className: 'apik-ks-warn' },
+              othersRunning + ' 个其他会话正在执行任务，切换将被阻止',
+            ) : null,
             profiles.map((p) => React.createElement('button', {
               key: p.id,
               type: 'button',
