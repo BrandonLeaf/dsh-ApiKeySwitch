@@ -44,10 +44,20 @@ return {
       '.apik-set-editorRoute{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}' +
       '.apik-set-field{flex-direction:column;gap:6px;display:flex}' +
       '.apik-set-fieldLabel{color:var(--dsw-alias-label-secondary);align-items:center;gap:10px;font-size:12px;font-weight:500;line-height:18px;display:inline-flex}' +
+      '.apik-set-hint{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}' +
       '.apik-set-input{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);width:100%;height:32px;font:inherit;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 10px;font-size:14px;line-height:22px}' +
       '.apik-set-input:focus{border-color:var(--dsw-alias-brand-primary);outline:none}' +
       '.apik-set-input::placeholder{color:var(--dsw-alias-label-dimmed)}' +
       '.apik-set-input:disabled{opacity:.6;cursor:default}' +
+      '.apik-set-dirs{flex-direction:column;gap:8px;display:flex}' +
+      '.apik-set-dirRow{align-items:center;gap:8px;display:flex}' +
+      '.apik-set-dirItem{align-items:center;gap:8px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:6px 10px;display:flex}' +
+      '.apik-set-dirCopy{flex-direction:column;flex:1;min-width:0;display:flex}' +
+      '.apik-set-dirName{color:var(--dsw-alias-label-primary);text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500;line-height:20px;overflow:hidden}' +
+      '.apik-set-dirPath{color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden}' +
+      '.apik-set-dirItem .apik-set-btnSecondary{border-radius:14px;height:28px;padding:0 10px;font-size:12px;line-height:18px}' +
+      '.apik-set-dirRow .apik-set-input{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}' +
+      '.apik-set-dirAdd{align-self:flex-start;border-radius:14px;height:28px;padding:0 10px;font-size:12px;line-height:18px}' +
       '.apik-set-editorActions{justify-content:flex-end;gap:8px;display:flex}' +
       '.apik-set-addCard{background:var(--dsw-alias-bg-module-platform);border-radius:12px;flex-direction:column;gap:14px;padding:14px 16px;list-style:none;display:flex}' +
       '.apik-set-msg{color:var(--dsw-alias-state-success-primary);margin:0;font-size:12px;line-height:18px}' +
@@ -81,7 +91,7 @@ return {
         try { fn(text) } catch (e) { /* 单个订阅者异常不影响其他订阅者 */ }
       }
     }
-    const notifySwitch = (id, value) => {
+    const notifySwitch = (id, value, prefix) => {
       let name = LABELS[id] || id
       const list = (value && value.profiles) || []
       for (const p of list) {
@@ -89,7 +99,36 @@ return {
         if (p.remark && p.remark !== name) name += '（' + p.remark + '）'
         break
       }
-      publishToast('API Key 切换成功：已切换至「' + name + '」')
+      publishToast((prefix || 'API Key 切换成功') + '：已切换至「' + name + '」')
+    }
+
+    // ── 模型目录（由 Host 实时下发，与「设置-模型」页同源）──
+    // 不再硬编码模型 id：供应商模型换代、改名或下线后
+    // 由 Host 从 settings 命名空间实时解析，界面与默认路由自动跟随。
+    const catalogOf = (value) => {
+      const list = value && value.catalog
+      if (Array.isArray(list) && list.length > 0) return list
+      const providers = value && value.providers
+      return Array.isArray(providers) ? providers : []
+    }
+    const modelsOf = (catalog, provider) => {
+      const hit = (catalog || []).find((p) => p.id === provider)
+      return hit && Array.isArray(hit.models) ? hit.models : []
+    }
+    const modelIdsOf = (catalog, provider) => modelsOf(catalog, provider).map((m) => m.id)
+    const pickModel = (catalog, provider, current, defaultRoute) => {
+      const ids = modelIdsOf(catalog, provider)
+      if (ids.length === 0) return current || ''
+      if (current && ids.indexOf(current) !== -1) return current
+      if (defaultRoute && defaultRoute.provider === provider && ids.indexOf(defaultRoute.model) !== -1) return defaultRoute.model
+      return ids[0]
+    }
+    const pickProvider = (catalog, current, defaultRoute) => {
+      const ids = (catalog || []).map((p) => p.id)
+      if (ids.length === 0) return current || ''
+      if (current && ids.indexOf(current) !== -1) return current
+      if (defaultRoute && ids.indexOf(defaultRoute.provider) !== -1) return defaultRoute.provider
+      return ids[0]
     }
 
     slots.inject('shell.overlay', () => slots.register(
@@ -125,46 +164,81 @@ return {
         const [drafts, setDrafts] = React.useState({})
         const [editingId, setEditingId] = React.useState(null)
         const [addOpen, setAddOpen] = React.useState(false)
-        const [addDraft, setAddDraft] = React.useState({ editId: '', key: '', remark: '', provider: '', model: '' })
-        const [modelOptions, setModelOptions] = React.useState(['deepseek-v4-flash', 'deepseek-v4-pro'])
+        const [addDraft, setAddDraft] = React.useState({ editId: '', key: '', remark: '', provider: '', model: '', dirs: [] })
+        const [cat, setCat] = React.useState({ catalog: [], defaultRoute: null, picker: 'unavailable' })
         const [busy, setBusy] = React.useState(false)
         const [msg, setMsg] = React.useState('')
         const [err, setErr] = React.useState('')
         const [confirmId, setConfirmId] = React.useState('')
+        const [picking, setPicking] = React.useState('')
 
-        React.useEffect(() => {
-          host.call('models').then((v) => {
-            const value = v || {}
-            if (value.ok && Array.isArray(value.models) && value.models.length > 0) {
-              setModelOptions(value.models.map((m) => m.id || m))
-            }
-          }).catch(() => { /* 保持默认列表 */ })
-        }, [])
+        const applyPayload = (value) => {
+          const v = value || {}
+          if (v.ok === false && v.error) setErr(String(v.error))
+          else setErr('')
+          setCat({ catalog: catalogOf(v), defaultRoute: v.defaultRoute || null, picker: v.directoryPicker || 'unavailable' })
+          if (Array.isArray(v.profiles)) {
+            setRows(v.profiles.map((p) => ({
+              id: p.id,
+              editId: LABELS[p.id] || p.id,
+              key: '',
+              remark: p.remark || '',
+              provider: p.provider || '',
+              model: p.model || '',
+              modelStale: !!p.modelStale,
+              modelStored: p.modelStored || '',
+              dirs: Array.isArray(p.dirs) ? p.dirs.slice() : [],
+              ref: p.ref,
+              user: !!p.user,
+              configured: !!p.configured,
+              active: !!p.active,
+            })))
+            setDrafts({})
+            setEditingId(null)
+            setConfirmId('')
+          }
+        }
 
         const load = () => {
           setErr('')
-          host.call('list').then((v) => {
-            const value = v || {}
-            if (value.ok === false && value.error) setErr(String(value.error))
-            else setErr('')
-            if (Array.isArray(value.profiles)) {
-              setRows(value.profiles.map((p) => ({ id: p.id, editId: LABELS[p.id] || p.id, key: '', remark: p.remark || '', provider: p.provider || '', model: p.model || '', ref: p.ref, user: !!p.user, configured: !!p.configured, active: !!p.active })))
-              setDrafts({})
-              setEditingId(null)
-              setConfirmId('')
-              setMsg('')
-            }
-          }).catch((e) => setErr(String(e && e.message ? e.message : e)))
+          host.call('list').then(applyPayload).catch((e) => setErr(String(e && e.message ? e.message : e)))
         }
         React.useEffect(() => { load() }, [])
 
         const openEditor = (r) => {
-          setDrafts((d) => Object.assign({}, d, { [r.id]: { editId: r.editId, key: '', remark: r.remark, provider: r.provider, model: r.model } }))
+          const provider = pickProvider(cat.catalog, r.provider, cat.defaultRoute)
+          const model = pickModel(cat.catalog, provider, r.model, cat.defaultRoute)
+          setDrafts((d) => Object.assign({}, d, { [r.id]: { editId: r.editId, key: '', remark: r.remark, provider: provider, model: model, dirs: r.dirs.slice() } }))
           setEditingId(editingId === r.id ? null : r.id)
           setConfirmId('')
         }
         const patchDraft = (id, patch) => setDrafts((d) => Object.assign({}, d, { [id]: Object.assign({}, d[id], patch) }))
         const patchAdd = (patch) => setAddDraft((d) => Object.assign({}, d, patch))
+        const patchDir = (id, index, value) => {
+          const d = drafts[id]
+          if (!d) return
+          const next = d.dirs.slice()
+          next[index] = value
+          patchDraft(id, { dirs: next })
+        }
+        const removeDir = (id, index) => {
+          const d = drafts[id]
+          if (!d) return
+          const next = d.dirs.slice()
+          next.splice(index, 1)
+          patchDraft(id, { dirs: next })
+        }
+        const patchAddDir = (index, value) => {
+          const next = addDraft.dirs.slice()
+          next[index] = value
+          patchAdd({ dirs: next })
+        }
+        const removeAddDir = (index) => {
+          const next = addDraft.dirs.slice()
+          next.splice(index, 1)
+          patchAdd({ dirs: next })
+        }
+        const cleanDirs = (dirs) => (dirs || []).map((x) => String(x).trim()).filter((x) => x !== '')
 
         const commit = (id) => {
           if (busy) return
@@ -179,6 +253,7 @@ return {
           payload.remark = d.remark.trim()
           payload.provider = d.provider.trim()
           payload.model = d.model.trim()
+          payload.dirs = cleanDirs(d.dirs)
           if (d.key.trim() !== '') payload.key = d.key.trim()
           host.call('save', payload).then((v) => {
             const value = v || {}
@@ -193,11 +268,11 @@ return {
           setBusy(true)
           setErr('')
           setMsg('')
-          host.call('add', { id: addDraft.editId, key: addDraft.key, remark: addDraft.remark, provider: addDraft.provider, model: addDraft.model })
+          host.call('add', { id: addDraft.editId, key: addDraft.key, remark: addDraft.remark, provider: addDraft.provider, model: addDraft.model, dirs: cleanDirs(addDraft.dirs) })
             .then((v) => {
               const value = v || {}
               if (value.ok === false) setErr(String(value.error || '新增失败'))
-              else { setMsg(value.message || '已新增'); setAddOpen(false); setAddDraft({ editId: '', key: '', remark: '', provider: '', model: '' }) }
+              else { setMsg(value.message || '已新增'); setAddOpen(false); setAddDraft({ editId: '', key: '', remark: '', provider: '', model: '', dirs: [] }) }
               load()
             }).catch((e) => setErr(String(e && e.message ? e.message : e))).then(() => setBusy(false))
         }
@@ -219,7 +294,135 @@ return {
           React.createElement('span', { className: 'apik-set-fieldLabel' }, label),
           input,
         )
-
+        // 含交互元素的字段：用 div 承载（避免 button 落入 label 触发聚焦）
+        const fieldBox = (label, hint, content) => React.createElement('div', { className: 'apik-set-field' },
+          React.createElement('span', { className: 'apik-set-fieldLabel' }, label),
+          hint ? React.createElement('span', { className: 'apik-set-hint' }, hint) : null,
+          content,
+        )
+        // 目录选择：「+ 添加目录」直接调用宿主 directoryPicker（macOS 为 Finder
+        // 选择框）并生成一条记录（目录名 + 小字完整路径）；「重选」替换该行路径。
+        // 仅在宿主 capability 为 native 时走选择器流程（browse/不可用时按宿主
+        // 契约退回手动填写输入框）。
+        const dirBaseName = (path) => {
+          const parts = String(path || '').split(/[/\\]/).filter((x) => x !== '')
+          return parts.length > 0 ? parts[parts.length - 1] : String(path || '')
+        }
+        const sameDirValue = (a, b) => {
+          const na = String(a || '').replace(/[/\\]+$/, '')
+          const nb = String(b || '').replace(/[/\\]+$/, '')
+          return na !== '' && na === nb
+        }
+        const pickDirPath = () => host.call('pickDir').then((v) => {
+          const value = v || {}
+          if (value.ok === false) { setErr(String(value.error || '目录选择失败')); return null }
+          if (value.cancelled === true || !value.path) return null
+          return String(value.path)
+        }).catch((e) => { setErr(String(e && e.message ? e.message : e)); return null })
+        const chooseDir = (id, index) => {
+          if (busy || picking !== '') return
+          setPicking(id + ':' + index)
+          setErr('')
+          setMsg('')
+          pickDirPath().then((path) => {
+            if (!path) return
+            const d = drafts[id]
+            if (!d) return
+            const next = d.dirs.slice()
+            next[index] = path
+            patchDraft(id, { dirs: next })
+          }).then(() => setPicking(''))
+        }
+        const addDirEntry = (id) => {
+          if (cat.picker !== 'native') {
+            const d0 = drafts[id]
+            if (d0) patchDraft(id, { dirs: d0.dirs.concat(['']) })
+            return
+          }
+          if (busy || picking !== '') return
+          setPicking(id + ':new')
+          setErr('')
+          setMsg('')
+          pickDirPath().then((path) => {
+            if (!path) return
+            const d = drafts[id]
+            if (!d) return
+            const list = d.dirs || []
+            if (list.some((x) => sameDirValue(x, path))) { setMsg('该目录已在列表中：' + path); return }
+            patchDraft(id, { dirs: list.concat([path]) })
+          }).then(() => setPicking(''))
+        }
+        const chooseAddDir = (index) => {
+          if (busy || picking !== '') return
+          setPicking('__add__:' + index)
+          setErr('')
+          setMsg('')
+          pickDirPath().then((path) => {
+            if (!path) return
+            const next = addDraft.dirs.slice()
+            next[index] = path
+            patchAdd({ dirs: next })
+          }).then(() => setPicking(''))
+        }
+        const addAddDirEntry = () => {
+          if (cat.picker !== 'native') {
+            patchAdd({ dirs: addDraft.dirs.concat(['']) })
+            return
+          }
+          if (busy || picking !== '') return
+          setPicking('__add__:new')
+          setErr('')
+          setMsg('')
+          pickDirPath().then((path) => {
+            if (!path) return
+            const list = addDraft.dirs || []
+            if (list.some((x) => sameDirValue(x, path))) { setMsg('该目录已在列表中：' + path); return }
+            patchAdd({ dirs: list.concat([path]) })
+          }).then(() => setPicking(''))
+        }
+        const dirsEditor = (dirs, onPatch, onRemove, onAdd, onPick, pickKey) => {
+          const list = dirs || []
+          if (cat.picker !== 'native') {
+            return React.createElement('div', { className: 'apik-set-dirs' },
+              list.map((dir, i) => React.createElement('div', { className: 'apik-set-dirRow', key: 'dir' + i },
+                React.createElement('input', {
+                  className: 'apik-set-input',
+                  value: dir,
+                  placeholder: '/绝对路径/到/workspace',
+                  onChange: (e) => onPatch(i, e.target.value),
+                }),
+                React.createElement('button', { type: 'button', className: 'apik-set-btnSecondary', disabled: busy || picking !== '', onClick: () => onRemove(i) }, '移除'),
+              )),
+              React.createElement('button', { type: 'button', className: 'apik-set-btnSecondary apik-set-dirAdd', disabled: busy || picking !== '', onClick: onAdd }, '+ 添加目录'),
+            )
+          }
+          return React.createElement('div', { className: 'apik-set-dirs' },
+            list.map((dir, i) => {
+              const key = pickKey + ':' + i
+              return React.createElement('div', { className: 'apik-set-dirItem', key: 'dir' + i },
+                React.createElement('span', { className: 'apik-set-dirCopy', title: dir },
+                  React.createElement('span', { className: 'apik-set-dirName' }, dirBaseName(dir)),
+                  React.createElement('span', { className: 'apik-set-dirPath' }, dir),
+                ),
+                React.createElement('button', {
+                  type: 'button',
+                  className: 'apik-set-btnSecondary',
+                  disabled: busy || picking !== '',
+                  title: '重新打开系统目录选择框',
+                  onClick: () => onPick(i),
+                }, picking === key ? '选择中…' : '重选'),
+                React.createElement('button', { type: 'button', className: 'apik-set-btnSecondary', disabled: busy || picking !== '', onClick: () => onRemove(i) }, '移除'),
+              )
+            }),
+            React.createElement('button', {
+              type: 'button',
+              className: 'apik-set-btnSecondary apik-set-dirAdd',
+              disabled: busy || picking !== '',
+              title: '打开系统目录选择框',
+              onClick: onAdd,
+            }, picking === pickKey + ':new' ? '选择中…' : '+ 添加目录'),
+          )
+        }
         const renderRow = (r) => {
           const d = drafts[r.id]
           const open = editingId === r.id
@@ -229,6 +432,8 @@ return {
                 React.createElement('span', { className: 'apik-set-rowName' }, LABELS[r.id] || r.id),
                 r.remark ? React.createElement('span', { className: 'apik-set-rowTag' }, r.remark) : null,
                 r.provider && r.provider !== 'deepseek-official' ? React.createElement('span', { className: 'apik-set-rowTag' }, r.provider) : null,
+                r.dirs && r.dirs.length > 0 ? React.createElement('span', { className: 'apik-set-rowTag', title: r.dirs.join('\n') }, '目录 ' + r.dirs.length) : null,
+                r.modelStale ? React.createElement('span', { className: 'apik-set-rowTag', title: '原模型 ' + (r.modelStored || '') + ' 已不在当前模型目录中，运行时按 ' + r.model + ' 生效' }, '模型已更新') : null,
                 React.createElement('span', { className: 'apik-set-dot ' + (r.configured ? 'apik-set-dotOk' : 'apik-set-dotMissing'), title: r.configured ? '已配置 Key' : '未配置 Key' }),
               ),
               React.createElement('span', { className: 'apik-set-rowActions' },
@@ -244,7 +449,9 @@ return {
               field(r.configured ? 'API Key（已配置，留空不修改）' : 'API Key（未配置）', React.createElement('input', { className: 'apik-set-input', type: 'password', value: d.key, placeholder: 'sk- 开头', onChange: (e) => patchDraft(r.id, { key: e.target.value }) })),
               field('备注 remark', React.createElement('input', { className: 'apik-set-input', value: d.remark, placeholder: '如：内部系统', onChange: (e) => patchDraft(r.id, { remark: e.target.value }) })),
               field('模型供应商 provider', React.createElement('input', { className: 'apik-set-input', list: 'apik-provider-list', value: d.provider, placeholder: '如 deepseek-official', onChange: (e) => patchDraft(r.id, { provider: e.target.value }) })),
-              field('默认模型 model', React.createElement('input', { className: 'apik-set-input', list: 'apik-model-list', value: d.model, placeholder: '如 deepseek-v4-flash', onChange: (e) => patchDraft(r.id, { model: e.target.value }) })),
+              field('默认模型 model', React.createElement('input', { className: 'apik-set-input', list: 'apik-model-list', value: d.model, placeholder: '从模型目录中选择', onChange: (e) => patchDraft(r.id, { model: e.target.value }) })),
+              r.modelStale ? React.createElement('p', { className: 'apik-set-hint' }, '原模型 ' + (r.modelStored || '（空）') + ' 已不在当前模型目录中，切换该项目时按 ' + r.model + ' 同步默认路由；保存后写回配置。') : null,
+              fieldBox('工作目录 dirs（可选，支持多个）', (cat.picker === 'native' ? '点击「+ 添加目录」打开系统目录选择框；切换 workspace 到这些目录时自动切换到本项目；一个目录只能绑定一个项目。' : '切换 workspace 到这些目录时自动切换到本项目；一个目录只能绑定一个项目。'), dirsEditor(d.dirs, (i, v) => patchDir(r.id, i, v), (i) => removeDir(r.id, i), () => addDirEntry(r.id), (i) => chooseDir(r.id, i), r.id)),
               React.createElement('div', { className: 'apik-set-editorActions' },
                 r.id !== 'personal' ? React.createElement('button', { className: 'apik-set-btnDanger', disabled: busy, onClick: () => removeRow(r) }, confirmId === r.id ? '确认删除' : '删除') : null,
                 React.createElement('div', { style: { flex: 1 } }),
@@ -263,7 +470,8 @@ return {
           field('API Key', React.createElement('input', { className: 'apik-set-input', type: 'password', value: addDraft.key, placeholder: 'sk- 开头', onChange: (e) => patchAdd({ key: e.target.value }) })),
           field('备注 remark', React.createElement('input', { className: 'apik-set-input', value: addDraft.remark, placeholder: '如：内部系统', onChange: (e) => patchAdd({ remark: e.target.value }) })),
           field('模型供应商 provider', React.createElement('input', { className: 'apik-set-input', list: 'apik-provider-list', value: addDraft.provider, placeholder: '如 deepseek-official', onChange: (e) => patchAdd({ provider: e.target.value }) })),
-          field('默认模型 model', React.createElement('input', { className: 'apik-set-input', list: 'apik-model-list', value: addDraft.model, placeholder: '如 deepseek-v4-flash', onChange: (e) => patchAdd({ model: e.target.value }) })),
+          field('默认模型 model', React.createElement('input', { className: 'apik-set-input', list: 'apik-model-list', value: addDraft.model, placeholder: '从模型目录中选择', onChange: (e) => patchAdd({ model: e.target.value }) })),
+          fieldBox('工作目录 dirs（可选，支持多个）', (cat.picker === 'native' ? '点击「+ 添加目录」打开系统目录选择框；切换 workspace 到这些目录时自动切换到本项目；一个目录只能绑定一个项目。' : '切换 workspace 到这些目录时自动切换到本项目；一个目录只能绑定一个项目。'), dirsEditor(addDraft.dirs, patchAddDir, removeAddDir, addAddDirEntry, chooseAddDir, '__add__')),
           React.createElement('div', { className: 'apik-set-editorActions' },
             React.createElement('button', { className: 'apik-set-btnSecondary', disabled: busy, onClick: () => setAddOpen(false) }, '取消'),
             React.createElement('button', { className: 'apik-set-btnPrimary', disabled: busy, onClick: commitAdd }, '新增'),
@@ -272,7 +480,7 @@ return {
 
         return React.createElement('div', { className: 'apik-set-section' },
           React.createElement('h2', { className: 'apik-set-title' }, 'API Key 管理'),
-          React.createElement('p', { className: 'apik-set-intro' }, '维护各项目的名称、密钥、备注、模型供应商与默认模型；切换项目时同步切换 Key、供应商与默认模型。'),
+          React.createElement('p', { className: 'apik-set-intro' }, '维护各项目的名称、密钥、备注、模型供应商、默认模型与工作目录；切换项目时同步切换 Key、供应商与默认模型，切换到已绑定目录的 workspace 时自动切换。'),
           React.createElement('div', { className: 'apik-set-toolbar' },
             React.createElement('button', { className: 'apik-set-btnSecondary', disabled: busy, onClick: () => setAddOpen(!addOpen) }, addOpen ? '收起新增' : '+ 新增项目'),
             rows ? React.createElement('span', { className: 'apik-set-intro' }, '共 ' + rows.length + ' 个项目') : null,
@@ -286,10 +494,12 @@ return {
                 rows.map(renderRow),
               ),
           React.createElement('datalist', { id: 'apik-provider-list' },
-            React.createElement('option', { value: 'deepseek-official' }),
+            cat.catalog.map((p) => React.createElement('option', { key: p.id, value: p.id })),
           ),
           React.createElement('datalist', { id: 'apik-model-list' },
-            modelOptions.map((m) => React.createElement('option', { key: m, value: m })),
+            cat.catalog.reduce((acc, p) => acc.concat(modelsOf(cat.catalog, p.id).map((m) => m.id)), [])
+              .filter((id, i, all) => id && all.indexOf(id) === i)
+              .map((id) => React.createElement('option', { key: id, value: id })),
           ),
         )
       },
@@ -416,6 +626,7 @@ return {
       '.apik-ks-menu{z-index:20;border:1px solid var(--dsw-alias-border-inverted);background:var(--dsw-specific-menu);width:min(220px,100vw - 32px);max-height:min(320px,100vh - 96px);box-shadow:var(--dsw-shadow-lv3);color:var(--dsw-alias-label-primary);border-radius:12px;flex-direction:column;padding:4px;display:flex;position:absolute;bottom:calc(100% + 8px);right:0;overflow-y:auto}' +
       '.apik-ks-error{background:var(--dsw-alias-interactive-bg-hover-danger);color:var(--dsw-alias-state-error-primary);border-radius:8px;gap:8px;margin-bottom:4px;padding:7px 8px;font-size:12px;line-height:18px;display:flex}' +
       '.apik-ks-warn{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);border-radius:8px;gap:8px;margin-bottom:4px;padding:7px 8px;font-size:12px;line-height:18px;display:flex}' +
+      '.apik-ks-dir{color:var(--dsw-alias-label-tertiary);border-bottom:1px solid var(--dsw-alias-border-l2);margin-bottom:4px;padding:4px 8px 8px;font-size:11px;line-height:16px;word-break:break-all;display:block}' +
       '.apik-ks-option{width:100%;min-height:38px;color:inherit;text-align:left;cursor:pointer;background:transparent;border:none;border-radius:10px;outline:none;align-items:center;gap:8px;padding:6px 8px;display:flex}' +
       '.apik-ks-option:hover:not(:disabled),.apik-ks-option:focus-visible{background:var(--dsw-alias-interactive-bg-hover)}' +
       '.apik-ks-option:disabled{color:var(--dsw-alias-label-dimmed);cursor:default}' +
@@ -441,6 +652,7 @@ return {
         const [busy, setBusy] = React.useState(false)
         const [open, setOpen] = React.useState(false)
         const [error, setError] = React.useState('')
+        const [dirInfo, setDirInfo] = React.useState(null)
 
         const applyResult = (value) => {
           const v = value || {}
@@ -478,7 +690,40 @@ return {
           }).catch(() => { /* 静默 */ })
         }
 
-        React.useEffect(() => { refresh(); restoreConv() }, [])
+        // 目录自动切换：命中目录绑定时由 Host 决定是否写入生效槽。
+        // 返回 true 表示目录绑定已接管本次激活（命中，无论成功/被守卫阻止），
+        // 此时不再回落到会话记忆，避免与目录绑定互相覆盖。
+        const autoByDir = (callback) => {
+          if (!sessionId) { callback(false); return }
+          host.call('auto', { sessionId: sessionId }).then((v) => {
+            const value = v || {}
+            if (value.matched !== true) {
+              setDirInfo(value.dir ? { dir: value.dir, profile: null } : null)
+              callback(false)
+              return
+            }
+            setDirInfo({ dir: value.dir || '', profile: value.dirProfile || null })
+            if (value.ok === false) {
+              if (value.guard === true) publishToast('已阻止目录自动切换：' + (value.error || '有会话正在执行任务'))
+              else publishToast('目录自动切换失败：' + (value.error || '未知错误'))
+              applyResult(value)
+              callback(true)
+              return
+            }
+            if (value.switched !== false && value.switchedTo) {
+              rememberConv(sessionId, value.switchedTo)
+              notifySwitch(value.switchedTo, value, '已按目录自动切换')
+            }
+            applyResult(value)
+            callback(true)
+          }).catch(() => callback(false))
+        }
+
+        React.useEffect(() => {
+          setDirInfo(null)
+          refresh()
+          autoByDir((handled) => { if (!handled) restoreConv() })
+        }, [sessionId])
 
         const doSwitch = (id) => {
           if (busy || !id) return
@@ -549,22 +794,28 @@ return {
             othersRunning > 0 ? React.createElement('div', { className: 'apik-ks-warn' },
               othersRunning + ' 个其他会话正在执行任务，切换将被阻止',
             ) : null,
-            profiles.map((p) => React.createElement('button', {
-              key: p.id,
-              type: 'button',
-              role: 'menuitemradio',
-              'aria-checked': p.active ? 'true' : 'false',
-              className: 'apik-ks-option',
-              disabled: !p.configured,
-              title: p.ref + (p.configured ? '' : '（未配置 Key）'),
-              onClick: () => { doSwitch(p.id); setOpen(false) },
-            },
-              React.createElement('span', { className: 'apik-ks-optionCopy' },
-                React.createElement('span', { className: 'apik-ks-optionLabel' }, LABELS_KS[p.id] || p.id),
-                React.createElement('span', { className: 'apik-ks-optionDesc' }, (p.remark || '') + (p.provider && p.provider !== 'deepseek-official' ? ' · ' + p.provider : '') + (p.configured ? '' : '（未配置）')),
-              ),
-              p.active ? React.createElement('span', { className: 'apik-ks-check' }, checkIcon) : null,
-            )),
+            dirInfo && dirInfo.dir ? React.createElement('span', { className: 'apik-ks-dir' },
+              '目录：' + dirInfo.dir + (dirInfo.profile ? ' → ' + (LABELS_KS[dirInfo.profile] || dirInfo.profile) : '（未绑定）'),
+            ) : null,
+            profiles.map((p) => {
+              const dirs = Array.isArray(p.dirs) ? p.dirs : []
+              return React.createElement('button', {
+                key: p.id,
+                type: 'button',
+                role: 'menuitemradio',
+                'aria-checked': p.active ? 'true' : 'false',
+                className: 'apik-ks-option',
+                disabled: !p.configured,
+                title: p.ref + (p.configured ? '' : '（未配置 Key）') + (dirs.length > 0 ? '\n目录：' + dirs.join('\n') : ''),
+                onClick: () => { doSwitch(p.id); setOpen(false) },
+              },
+                React.createElement('span', { className: 'apik-ks-optionCopy' },
+                  React.createElement('span', { className: 'apik-ks-optionLabel' }, LABELS_KS[p.id] || p.id),
+                  React.createElement('span', { className: 'apik-ks-optionDesc' }, (p.remark || '') + (p.provider && p.provider !== 'deepseek-official' ? ' · ' + p.provider : '') + (dirs.length > 0 ? ' · 目录 ' + dirs.length : '') + (p.configured ? '' : '（未配置）')),
+                ),
+                p.active ? React.createElement('span', { className: 'apik-ks-check' }, checkIcon) : null,
+              )
+            }),
           ) : null,
         )
       },

@@ -1,23 +1,61 @@
 {
   "name": "ApiKeySwitch",
   "idPrefix": "apik",
-  "version": "0.1.0",
-  "purpose": "按项目维护独立的 DeepSeek API Key：模型工具 + 作曲栏切换下拉框 + Run 卡片面板 + 设置页管理，切换时同步模型供应商与默认模型。",
-  "platforms": ["host", "client"],
+  "version": "0.1.1",
+  "purpose": "按项目维护独立的 DeepSeek API Key：模型工具 + 作曲栏切换下拉框 + Run 卡片面板 + 设置页管理，切换时同步模型供应商与默认模型，切换到已绑定工作目录的 workspace 时自动切换。",
+  "platforms": [
+    "host",
+    "client"
+  ],
   "activeSlotRef": "DEEPSEEK_API_KEY",
   "backupRef": "DSH_APIK_BACKUP",
   "metaRef": "DSH_APIK_META",
   "defaultProvider": "deepseek-official",
-  "defaultModel": "deepseek-v4-flash",
+  "defaultModelSource": "agentDefaultModel.currentSelection()（实时默认路由，模型换代自动跟随）",
+  "catalogSource": "llm.listProviders / llm.listConfigurableProviders + settings 命名空间 models",
+  "metaDirsKey": "dirs",
   "builtinProfiles": [
-    { "id": "personal", "label": "default", "remark": "默认", "ref": "DEEPSEEK_API_KEY", "protected": true }
+    {
+      "id": "personal",
+      "label": "default",
+      "remark": "默认",
+      "ref": "DEEPSEEK_API_KEY",
+      "protected": true
+    }
   ],
   "slots": {
-    "settings": { "id": "apik-switch", "label": "API Key 管理", "order": 12 },
-    "composer": { "id": "apik-composer-switch", "order": 100 },
+    "settings": {
+      "id": "apik-switch",
+      "label": "API Key 管理",
+      "order": 12
+    },
+    "composer": {
+      "id": "apik-composer-switch",
+      "order": 100
+    },
     "runCard": "tool.view.cordis",
-    "toast": { "slot": "shell.overlay", "id": "apik-toast", "order": 100 }
+    "toast": {
+      "slot": "shell.overlay",
+      "id": "apik-toast",
+      "order": 100
+    }
   },
-  "tools": ["api_key_status", "api_key_switch", "api_key_set"],
-  "rpcMethods": ["status", "list", "models", "switch", "set", "save", "add", "remove"]
+  "tools": [
+    "api_key_status",
+    "api_key_switch",
+    "api_key_set"
+  ],
+  "rpcMethods": [
+    "status",
+    "list",
+    "models",
+    "catalog",
+    "auto",
+    "pickDir",
+    "switch",
+    "set",
+    "save",
+    "add",
+    "remove"
+  ]
 }

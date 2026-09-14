@@ -1,7 +1,7 @@
 {
   "name": "apikeyswitch",
-  "version": "0.1.1",
-  "description": "ApiKeySwitch - 按项目维护独立的 DeepSeek API Key 并手动切换（DSH 插件包）",
+  "version": "0.1.2",
+  "description": "ApiKeySwitch - 按项目维护独立的 DeepSeek API Key，支持手动切换与工作目录自动切换（DSH 插件包）",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
