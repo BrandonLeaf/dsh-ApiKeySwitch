@@ -7,7 +7,7 @@ DSH（DeepSeek Harness）Cordis 插件：按项目维护独立的 DeepSeek API K
 DSH 默认只为整个进程配置一把 API Key。本插件通过 DSH 的凭据接缝（`credentials` 服务 + `~/.dsh/.credentials.yaml`）为每个项目维护独立 Key，并提供三个切换入口：
 
 - 作曲栏 Key 下拉框（模型切换框旁，外观对齐模型切换框）
-- Run 卡片内切换面板
+- Run 卡片内切换面板（仅动态插件形态提供，部署形态为设置页 + 作曲栏 + 模型工具）
 - 模型工具：`api_key_status` / `api_key_switch` / `api_key_set`
 
 切换写入 `DEEPSEEK_API_KEY`（生效槽），模型提供商每次请求重新解析，立即生效、无需重启。切换时通过 `agentDefaultModel.saveSelection` 同步默认路由（供应商 + 模型）。手动切换成功后页面底部弹出「API Key 切换成功」Toast 提示（会话激活时的静默恢复不提示）。
@@ -27,7 +27,8 @@ DSH 默认只为整个进程配置一把 API Key。本插件通过 DSH 的凭据
 | 项 | 说明 |
 | --- | --- |
 | 宿主环境 | DSH 0.1.5-alpha.2（@deepseek-ai/dsh） |
-| 插件形态 | 动态 Cordis 插件（Host + Client 双半区，Plain JavaScript） |
+| 插件版本 | 0.1.2（`package.json` 与 `plugin/manifest.json` 同步维护） |
+| 插件形态 | Cordis 插件（Host + Client 双半区，Plain JavaScript）；部署形态为进程级插件包，动态形态为 `cordis_define` 会话级插件 |
 | Host 接口 | `credentials`、`agentDefaultModel`、`llm`（listProviders / listConfigurableProviders / listModels）、`settings`（get）、`agents`、`workspaceRegistry`、`tools`（register）、`webServer`（register）；动态版为 `harness.defineTool / registerTool / handle` |
 | Client 接口 | `slots`（settings.section / conversation.input.right / shell.overlay）、同源 `fetch` 调用 `/apikeyswitch/api`、`styles`、React（createElement） |
 | 数据存储 | `~/.dsh/.credentials.yaml`（凭据接缝，热加载，权限 600） |
@@ -108,7 +109,7 @@ dsh plugin --profile web add "https://github.com/BrandonLeaf/dsh-ApiKeySwitch#ma
 
 流程：pnpm 安装仓库根目录为依赖 → `dsh plugin` 自动把声明了 `dsh.bundle` 的新依赖加入 `dsh.profile.bundles` → 启动时 bundle 补丁（`cordis.patch.yml`）自动插入插件行 → 插件挂载。无需手动编辑组合文件。安装后重启 `dsh web` 并刷新页面即可。
 
-要求：机器装有 pnpm 且可访问 git 托管地址；`github:` 为 pnpm spec，GitLab/内网仓库可改用 `git+https://...` 或 `git+ssh://...`；建议用标签固定版本（如 `#v0.1.0-rc.8-p-0.1.0`）。
+要求：机器装有 pnpm 且可访问 git 托管地址；`github:` 为 pnpm spec，GitLab/内网仓库可改用 `git+https://...` 或 `git+ssh://...`；建议用标签固定版本，标签格式为 `v<适配的 DSH 版本>-p-<插件版本>`，当前版本对应 `#v0.1.5-alpha.2-p-0.1.2`（已发布标签与版本变化见「版本对照」）。
 
 **方式 B：手动复制（本地单机）**
 
@@ -121,7 +122,7 @@ dsh plugin --profile web add "https://github.com/BrandonLeaf/dsh-ApiKeySwitch#ma
       name: apikeyswitch
 ```
 
-3. 重启 `dsh web` 进程（组合改动需要重启进程生效；HMR 需 `--expose-internals` 启动才可用），刷新页面后自动加载，无需手动运行。
+3. 重启 `dsh web` 进程（组合改动需要重启进程生效；profile 的 `patchReload: live` 只重放组合补丁，不会重新导入已缓存的插件模块），刷新页面后自动加载，无需手动运行。
 
 与动态版的差异：模型工具改用 `ctx.tools.register`，Client 通信改用 webServer HTTP 路由（`POST /apikeyswitch/api`，action 分发），不注册 Run 卡片面板（`tool.view.cordis` 为动态插件专属插槽）。
 
@@ -143,11 +144,22 @@ dsh plugin --profile web add "https://github.com/BrandonLeaf/dsh-ApiKeySwitch#ma
 | `~/.dsh/.credentials.yaml` | 各项目 Key、备份槽、元数据 JSON（权限必须 600） |
 | `~/.dsh/settings.yaml` | `agent-default-model` 默认路由与 `llm-deepseek` 模型目录（插件读取模型目录，切换时更新默认路由） |
 
+### 版本对照
+
+| 插件版本 | 适配 DSH 版本 | 标签 | 主要变化 |
+| --- | --- | --- | --- |
+| 0.1.2 | 0.1.5-alpha.2 | `v0.1.5-alpha.2-p-0.1.2` | 模型目录实时化（修复模型换代后仍关联旧模型）、工作目录自动切换、目录选择框 |
+| 0.1.1 | 0.1.0-rc.8 | `v0.1.0-rc.8-p-0.1.1` | 切换守卫（防止多会话并发时 API Key 交叉污染） |
+| 0.1.0 | 0.1.0-rc.8 | `v0.1.0-rc.8-p-0.1.0` | 首个版本：多项目 Key 管理、作曲栏切换、会话记忆 |
+
+兼容性说明：0.1.1 及更早版本在 DSH 0.1.5-alpha.2 上模型下拉框为空（客户端 `connection.api` 已移除，`llm.providers` / `settings.describe` 不再可用），且会把失效模型 id 写入默认路由；升级到 0.1.5-alpha.2 必须使用 0.1.2 及以上版本。
+
 ### 升级到 DSH 0.1.5-alpha.2 的同步步骤
 
-1. 将 `lib/` 与 `package.json` 复制到 `~/.dsh/profiles/web/node_modules/apikeyswitch/`；
-2. 重启 `dsh web`（Host 半区为进程级模块，热加载不覆盖已导入模块）；
-3. 刷新页面，Client 半区随 `apikeyswitch/client.js` 重新加载。
+1. 将 `lib/` 与 `package.json` 复制到 `~/.dsh/profiles/web/node_modules/apikeyswitch/`（`plugin/` 为动态形态源码，不需要复制到该目录）；
+2. 重启 `dsh web`（Host 半区为进程级模块，profile 的 `patchReload: live` 只重放组合补丁，不重新导入已缓存的 ESM 模块）；
+3. 刷新页面，Client 半区随 `apikeyswitch/client.js` 重新加载；
+4. 打开设置 ─► API Key 管理，确认模型下拉框显示当前模型目录中的模型（而非旧模型 id）。
 
 ## 文档索引
 
@@ -173,12 +185,15 @@ dsh plugin --profile web add "https://github.com/BrandonLeaf/dsh-ApiKeySwitch#ma
 - 运行时无每会话独立槽位：同一实例内两个会话并发执行时，Key 归属由请求发起瞬间的全局生效槽决定，守卫只能阻止"切换动作"，不能阻止"切完后新起步的请求"使用当前全局 Key
 - 路由同步写入默认模型选择（写入前按实时模型目录校正，失效模型 id 不会落盘）；当前会话运行中的模型由作曲栏「模型切换框」主导
 - 插件内不得出现供应商模型 id 字面量：模型目录与默认路由必须来自 `llm` / `settings` / `agentDefaultModel` 服务
-- 当前部署仅挂载 `deepseek-official` 供应商；`dsh-llm-example`（示例供应商）已安装但未挂载，配置其他供应商需先修改宿主组合（`~/.dsh/profiles/web/cordis.patch.yml`）并重启 Web 服务
+- 当前部署的可用供应商为 `deepseek-official`（由 `@deepseek-ai/dsh-llm-deepseek` 适配器提供）；`@deepseek-ai/dsh-llm-pi-ai` 适配器虽随宿主组合挂载，但其声明的其余供应商路由未配置，插件按「未挂载且未配置」过滤，不出现在供应商下拉框中；需要启用其他供应商时，先在「设置-模型」中配置该供应商（或修改宿主组合 `~/.dsh/profiles/web/cordis.patch.yml`）并重启 Web 服务
 - 文档与示例中不得出现真实 API Key，一律使用占位符（如 `sk-REPLACE_ME`）
 - 本仓库为示例形态，真实项目名称、备注、工作目录与凭据引用不得写入仓库
 
 
 ## 效果图
+
+以下截图取自 0.1.1 版界面（项目名称已打码），工作目录编辑区与目录记录为 0.1.2 新增，截图尚未更新。
+
 ![alt text](README.link/image-2.png)
 ![alt text](README.link/image-1.png)
 

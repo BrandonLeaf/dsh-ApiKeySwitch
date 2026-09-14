@@ -42,6 +42,8 @@ domains: [documentation, security, code-style, build-test]
 项目名称：ApiKeySwitch
 项目定位：DeepSeek Harness（DSH）Cordis 插件源码项目，为 DSH 提供按项目维护多把 DeepSeek API Key、手动切换与工作目录自动切换的能力。
 运行环境：DSH 0.1.5-alpha.2（@deepseek-ai/dsh）。
+插件版本：0.1.2（package.json 与 plugin/manifest.json 同步维护）；发布标签格式 v<适配的 DSH 版本>-p-<插件版本>，当前版本对应 v0.1.5-alpha.2-p-0.1.2（已发布）。
+版本兼容：0.1.1 及更早版本不兼容 DSH 0.1.5-alpha.2（客户端 connection.api 已移除导致模型目录取数失败，且会把失效模型 id 写入默认路由）。
 代码形态：仓库根目录即正式部署插件包（lib/ + package.json + cordis.patch.yml，支持 dsh plugin add 官方安装）；plugin/ 为动态插件形态（cordis_define 的 code.host / code.client 原文）。
 
 # Knowledge: 架构
@@ -111,7 +113,7 @@ api_key_status / api_key_switch / api_key_set；RPC：status / list / models / c
 - 目录绑定优先于会话记忆：同一会话内手动切到其他项目后，再次激活该会话仍按目录绑定切回
 - 目录绑定依赖 workspaceRegistry.resolveByPath 归一：目录不存在时回落字符串比较，指向不存在目录的绑定不会命中任何会话
 - 目录选择框在 dsh 宿主机屏幕弹出：仅 native capability（darwin/win32、loopback 绑定、非 SSH 启动）可用，远程/SSH 部署下退回手填输入框
-- 当前部署仅挂载 deepseek-official 供应商；dsh-llm-example（示例供应商）已安装但未挂载，其他供应商需先修改宿主组合
+- 当前部署可用供应商为 deepseek-official（@deepseek-ai/dsh-llm-deepseek）；@deepseek-ai/dsh-llm-pi-ai 声明的其余路由未配置，按「未挂载且未配置」过滤，需要时先在「设置-模型」配置或改宿主组合后重启
 - 凭据文件 ~/.dsh/.credentials.yaml 权限必须保持 600
 - Host 半区为进程级模块：复制新版 lib/ 到 ~/.dsh/profiles/web/node_modules/apikeyswitch/ 后 MUST 重启 dsh web 才生效（profile 的 patchReload: live 只重放组合补丁，不重新导入已缓存的 ESM 模块）
 - 切换守卫基于 agents 服务运行状态：守卫检查与写入生效槽之间存在极小的竞态窗口（检查后、写入前会话可能起步），需要严格隔离时 SHOULD 为每个项目使用独立 DSH profile 或独立进程
